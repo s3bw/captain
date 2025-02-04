@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"regexp"
 
 	"github.com/fatih/color"
+	"github.com/mattn/go-runewidth"
 	"github.com/s3bw/table"
 	"gorm.io/gorm"
 )
@@ -31,6 +33,32 @@ func fmtBox(task Do) string {
 	return "☐"
 }
 
+func fmtPrio(task Do) string {
+	light := task.Priority
+	// light := "m"
+
+	switch task.Priority {
+	case Low:
+		return color.New(color.FgBlue).Sprintf("%s", light)
+	case Medium:
+		return color.New(color.FgHiBlack).Sprintf("%s", light)
+	case High:
+		return color.New(color.FgRed).Sprintf("%s", light)
+	default:
+		return color.New(color.FgHiBlack).Sprintf("%s", light)
+	}
+}
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
+func WidthFunc(s string) int {
+	return runewidth.StringWidth(stripANSI(s))
+}
+
 func DoLog(conn *gorm.DB, n int) {
 
 	var tasks []Do
@@ -46,7 +74,7 @@ func DoLog(conn *gorm.DB, n int) {
 		fmt.Println("No tasks found.")
 	} else {
 		// Header
-		tbl := table.New("", "", "do", "did at", "doc", "type")
+		tbl := table.New("", "", "do", "did at", "doc", "type", "prio")
 		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 		tbl.WithHeaderFormatter(headerFmt)
 
@@ -59,13 +87,24 @@ func DoLog(conn *gorm.DB, n int) {
 		formatTime := color.New(color.FgHiBlack).SprintfFunc()
 		tbl.WithColumnFormatters(3, formatTime)
 
+		tbl.WithWidthFunc(WidthFunc)
+
 		// Should we join with tag here can display the
 		// tag??
 		for _, task := range tasks {
 			taskType := fmtDo(task)
 			checkBox := fmtBox(task)
+			prio := fmtPrio(task)
 
-			tbl.AddRow(checkBox, task.ID, task.Description, task.CreatedAt.Format("02-Jan-06 15:04"), "", taskType)
+			tbl.AddRow(
+				checkBox,
+				task.ID,
+				task.Description,
+				task.CreatedAt.Format("02-Jan-06 15:04"),
+				"",
+				taskType,
+				prio,
+			)
 		}
 
 		tbl.Print()

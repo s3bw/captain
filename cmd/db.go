@@ -21,6 +21,14 @@ const (
 	Brag DoType = "brag"
 )
 
+type DoPrio string
+
+const (
+	Low    DoPrio = "low"
+	Medium DoPrio = "medium"
+	High   DoPrio = "high"
+)
+
 type Do struct {
 	ID          uint      `gorm:"primaryKey"`
 	CreatedAt   time.Time `gorm:"default:current_timestamp"`
@@ -28,6 +36,7 @@ type Do struct {
 	Completed   bool           `gorm:"default:false"`
 	Description string         `gorm:"not null"`
 	Type        DoType         `gorm:"type:TEXT;not null"`
+	Priority    DoPrio         `gorm:"type:TEXT;not null;default:medium"`
 	Docs        sql.NullString `gorm:"type:TEXT"`
 	Deleted     bool           `gorm:"default:false"`
 }
