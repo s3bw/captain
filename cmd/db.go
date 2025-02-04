@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -22,9 +25,11 @@ type Do struct {
 	ID          uint      `gorm:"primaryKey"`
 	CreatedAt   time.Time `gorm:"default:current_timestamp"`
 	CompletedAt *time.Time
-	Completed   bool   `gorm:"default:false"`
-	Description string `gorm:"not null"`
-	Type        DoType `gorm:"type:TEXT;not null"`
+	Completed   bool           `gorm:"default:false"`
+	Description string         `gorm:"not null"`
+	Type        DoType         `gorm:"type:TEXT;not null"`
+	Docs        sql.NullString `gorm:"type:TEXT"`
+	Deleted     bool           `gorm:"default:false"`
 }
 
 func (DoType) GormDataType() string {
@@ -42,7 +47,21 @@ type DoTag struct {
 }
 
 func OpenConn() *gorm.DB {
-	conn, err := gorm.Open(sqlite.Open("newdb.db"), &gorm.Config{
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic("failed to get the user's home directory")
+	}
+
+	dbDir := fmt.Sprintf("%s/.captain", homeDir)
+	dbPath := fmt.Sprintf("%s/testdo.db", dbDir)
+
+	err = os.MkdirAll(dbDir, os.ModePerm)
+	if err != nil {
+		panic("failed to create directory")
+	}
+
+	conn, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
