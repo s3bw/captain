@@ -63,7 +63,7 @@ func OpenConn() *gorm.DB {
 	}
 
 	dbDir := fmt.Sprintf("%s/.captain", homeDir)
-	dbPath := fmt.Sprintf("%s/testdo.db", dbDir)
+	dbPath := fmt.Sprintf("%s/do.db", dbDir)
 
 	err = os.MkdirAll(dbDir, os.ModePerm)
 	if err != nil {

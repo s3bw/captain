@@ -63,6 +63,52 @@ var didCmd = &cobra.Command{
 	},
 }
 
+func mapPriority(s string) DoPrio {
+	switch s {
+	case "low":
+		return Low
+	case "med":
+		return Medium
+	case "high":
+		return High
+	default:
+		return Medium
+	}
+}
+
+var setPrioCmd = &cobra.Command{
+	Use:   "set <field> <value> <do_id>",
+	Short: "Changes something of a do, right now just priority",
+	Args:  cobra.ExactArgs(3),
+	Run: func(cmd *cobra.Command, args []string) {
+		field := args[0]
+		if field != "prio" {
+			fmt.Printf("The field '%s' is not supported.", field)
+			return
+		}
+		value := args[1]
+		id := args[2]
+
+		conn := OpenConn()
+
+		var do Do
+
+		result := conn.Not("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do with ID '%v'\n", id)
+			return
+		}
+
+		oldPrio := do.Priority
+
+		do.Priority = mapPriority(value)
+		conn.Save(&do)
+
+		fmt.Printf("Do %v updated '%v' -> '%v'\n", field, oldPrio, do.Priority)
+	},
+}
+
+// TODO
 var editCmd = &cobra.Command{
 	Use:   "edit <do_id> <new_message>",
 	Short: "Edit a task by ID",
@@ -85,8 +131,7 @@ var scratchCmd = &cobra.Command{
 
 		var do Do
 
-		result := conn.First(&do, id)
-
+		result := conn.Not("deleted = ?", true).First(&do, id)
 		if result.Error != nil {
 			fmt.Printf("No do under id '%v'\n", id)
 			return
@@ -95,6 +140,30 @@ var scratchCmd = &cobra.Command{
 		do.Deleted = true
 		conn.Save(&do)
 		fmt.Printf("Deleted do %d\n", do.ID)
+	},
+}
+
+var unscratchCmd = &cobra.Command{
+	Use:   "unscratch <do_id>",
+	Short: "Revert the soft deleted do",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+
+		conn := OpenConn()
+
+		var do Do
+
+		result := conn.First(&do, id)
+
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		do.Deleted = false
+		conn.Save(&do)
+		fmt.Printf("Resurrected %d\n", do.ID)
 	},
 }
 
@@ -116,14 +185,47 @@ var logCmd = &cobra.Command{
 		// How do we handle these?
 		// --include-done
 		// --done
-		DoLog(conn, n)
+		oneWeekAgo := time.Now().AddDate(0, 0, -7)
+
+		query := conn
+		query = query.Not("deleted = ?", true).
+			Where("completed_at IS NULL OR completed_at >= ?", oneWeekAgo).
+			Limit(n).Order(`
+			completed,
+			CASE priority
+				WHEN 'high' THEN 1
+				WHEN 'medium' THEN 2
+				WHEN 'low' THEN 3
+				ELSE 2
+			END, created_at DESC
+		`)
+
+		DoLog(conn, query)
 	},
 }
 
 var todayCmd = &cobra.Command{
-	Use: "today",
-	// We will need to sort this by completed at date time.
+	Use:   "today",
 	Short: "Log tasks done today",
+	Run: func(cmd *cobra.Command, args []string) {
+		conn := OpenConn()
+
+		oneDayAgo := time.Now().AddDate(0, 0, -1)
+
+		query := conn
+		query = query.Not("deleted = ?", true).
+			Where("completed_at IS NULL OR completed_at >= ?", oneDayAgo).
+			Limit(100).Order(`
+			completed,
+			CASE priority
+				WHEN 'high' THEN 1
+				WHEN 'medium' THEN 2
+				WHEN 'low' THEN 3
+				ELSE 2
+			END, created_at DESC
+		`)
+		DoLog(conn, query)
+	},
 }
 
 var recruitCmd = &cobra.Command{
@@ -143,6 +245,35 @@ var recruitCmd = &cobra.Command{
 		}
 
 		fmt.Printf("🏴‍☠️  Say welcome the new recruit! '%s'\n", name)
+	},
+}
+
+var crewCmd = &cobra.Command{
+	Use:   "crew",
+	Short: "List the crew",
+	Run: func(cmd *cobra.Command, args []string) {
+		conn := OpenConn()
+
+		var crew []struct {
+			Name  string
+			Count int64
+		}
+
+		result := conn.Table("tags").
+			Select("tags.name, COUNT(do_tags.tag_id) AS count").
+			Joins("LEFT JOIN do_tags ON do_tags.tag_id = tags.id").
+			Group("tags.id").
+			Order("count DESC").
+			Find(&crew)
+
+		if result.Error != nil {
+			fmt.Printf("We have no crew aboard! %v\n", result.Error)
+			return
+		}
+
+		for _, mate := range crew {
+			fmt.Printf("Mate: '%s', count: '%d'\n", mate.Name, mate.Count)
+		}
 	},
 }
 
@@ -170,7 +301,6 @@ var renameCmd = &cobra.Command{
 		coloredOldName := color.New(color.FgYellow).Sprintf("%s", oldName)
 		coloredName := color.New(color.FgGreen).Sprintf("%s", newName)
 		fmt.Printf("We are now calling '%v' -> '%v'\n", coloredOldName, coloredName)
-
 	},
 }
 
@@ -252,14 +382,47 @@ var bragCmd = &cobra.Command{
 var reassignCmd = &cobra.Command{
 	Use:   "reassign <do_id> <name>",
 	Short: "Reassign the do to someone else.",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		name := args[1]
+
+		conn := OpenConn()
+
+		var do Do
+
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		var tag Tag
+
+		result = conn.Where("name = ?", name).First(&tag)
+		if result.Error != nil {
+			fmt.Printf("No recruit called '%v'\n", name)
+			return
+		}
+
+		doTag := DoTag{DoID: do.ID, TagID: tag.ID}
+		if err := conn.Create(&doTag).Error; err != nil {
+			log.Fatalf("could not insert new row: %v", err)
+		}
+
+		conn.Save(&doTag)
+		fmt.Printf("We've reassigned the do to '%s'", name)
+	},
 }
 
+// TODO
 var docCmd = &cobra.Command{
 	Use:   "doc <do_id>",
 	Short: "Document the specifics",
 	Args:  cobra.ExactArgs(1),
 }
 
+// TODO
 var viewCmd = &cobra.Command{
 	Use:   "view <do_id>",
 	Short: "View the do",
@@ -273,15 +436,23 @@ func init() {
 		doCmd,
 		didCmd,
 		scratchCmd,
+		unscratchCmd,
+		setPrioCmd,
 		editCmd,
+		// Views
 		logCmd,
 		todayCmd,
+		// Crew Commands
+		// - manage
 		recruitCmd,
+		crewCmd,
 		renameCmd,
+		// - assignment
 		askCmd,
 		tellCmd,
-		reassignCmd,
 		bragCmd,
+		reassignCmd,
+		// More Details
 		docCmd,
 		viewCmd,
 	)

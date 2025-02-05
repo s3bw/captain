@@ -35,11 +35,10 @@ func fmtBox(task Do) string {
 
 func fmtPrio(task Do) string {
 	light := task.Priority
-	// light := "m"
 
 	switch task.Priority {
 	case Low:
-		return color.New(color.FgBlue).Sprintf("%s", light)
+		return color.New(color.FgHiBlack).Sprintf("%s", light)
 	case Medium:
 		return color.New(color.FgHiBlack).Sprintf("%s", light)
 	case High:
@@ -59,12 +58,9 @@ func WidthFunc(s string) int {
 	return runewidth.StringWidth(stripANSI(s))
 }
 
-func DoLog(conn *gorm.DB, n int) {
+func DoLog(conn *gorm.DB, query *gorm.DB) {
 
 	var tasks []Do
-
-	query := conn
-	query = query.Not("deleted = ?", true).Limit(n).Order("completed, created_at DESC")
 
 	if err := query.Find(&tasks).Error; err != nil {
 		log.Fatalf("could not fetch tasks: %v", err)
