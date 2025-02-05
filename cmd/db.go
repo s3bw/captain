@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -55,21 +54,8 @@ type DoTag struct {
 	TagID uint `gorm:"not null"`
 }
 
-func OpenConn() *gorm.DB {
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic("failed to get the user's home directory")
-	}
-
-	dbDir := fmt.Sprintf("%s/.captain", homeDir)
-	dbPath := fmt.Sprintf("%s/do.db", dbDir)
-
-	err = os.MkdirAll(dbDir, os.ModePerm)
-	if err != nil {
-		panic("failed to create directory")
-	}
-
+func OpenConn(cfg *Config) *gorm.DB {
+	dbPath := fmt.Sprintf("%s/%s", cfg.CaptainDir, cfg.DBFile)
 	conn, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})

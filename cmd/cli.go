@@ -21,7 +21,8 @@ var doCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		do := Do{
 			Description: message,
@@ -43,7 +44,8 @@ var didCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var fetched Do
 
@@ -89,7 +91,8 @@ var setPrioCmd = &cobra.Command{
 		value := args[1]
 		id := args[2]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var do Do
 
@@ -127,7 +130,8 @@ var scratchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var do Do
 
@@ -150,7 +154,8 @@ var unscratchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var do Do
 
@@ -171,16 +176,18 @@ var logCmd = &cobra.Command{
 	Use:   "log --include-done --sort=created_at",
 	Short: "Log tasks",
 	Run: func(cmd *cobra.Command, args []string) {
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 		// cmd.Flags().Bool("include-done", false, "Include completed tasks")
 		// cmd.Flags().String("sort", "created_at", "Sort tasks by the specifics")
 		n, _ := cmd.Flags().GetInt("n")
 
 		// includeDone, _ := cmd.Flags().GetBool("include-done")
 		// sortField, _ := cmd.Flags().GetString("sort")
-		// --type
 		// --target
 		// --sort
+		// Fetching by type
+		// --type
 
 		// How do we handle these?
 		// --include-done
@@ -208,7 +215,8 @@ var todayCmd = &cobra.Command{
 	Use:   "today",
 	Short: "Log tasks done today",
 	Run: func(cmd *cobra.Command, args []string) {
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		oneDayAgo := time.Now().AddDate(0, 0, -1)
 
@@ -234,7 +242,8 @@ var recruitCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		newTag := Tag{
 			Name: name,
@@ -252,7 +261,8 @@ var crewCmd = &cobra.Command{
 	Use:   "crew",
 	Short: "List the crew",
 	Run: func(cmd *cobra.Command, args []string) {
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var crew []struct {
 			Name  string
@@ -271,6 +281,7 @@ var crewCmd = &cobra.Command{
 			return
 		}
 
+		// TODO: This can look much nicer.
 		for _, mate := range crew {
 			fmt.Printf("Mate: '%s', count: '%d'\n", mate.Name, mate.Count)
 		}
@@ -285,7 +296,8 @@ var renameCmd = &cobra.Command{
 		oldName := args[0]
 		newName := args[1]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var tag Tag
 
@@ -312,7 +324,8 @@ var askCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		do := &Do{Description: message, Type: Ask}
 		tag := &Tag{Name: name}
@@ -337,7 +350,8 @@ var tellCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		do := &Do{Description: message, Type: Tell}
 		tag := &Tag{Name: name}
@@ -361,7 +375,8 @@ var bragCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		now := time.Now()
 		do := Do{
@@ -387,7 +402,8 @@ var reassignCmd = &cobra.Command{
 		id := args[0]
 		name := args[1]
 
-		conn := OpenConn()
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
 
 		var do Do
 
@@ -411,7 +427,7 @@ var reassignCmd = &cobra.Command{
 		}
 
 		conn.Save(&doTag)
-		fmt.Printf("We've reassigned the do to '%s'", name)
+		fmt.Printf("We've reassigned the do to '%s'\n", name)
 	},
 }
 
@@ -427,6 +443,23 @@ var viewCmd = &cobra.Command{
 	Use:   "view <do_id>",
 	Short: "View the do",
 	Args:  cobra.ExactArgs(1),
+}
+
+var configCmd = &cobra.Command{
+	Use:   "config <key> <value>",
+	Short: "Set items in the config file",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		key := args[0]
+		value := args[1]
+
+		cfg := LoadConfig()
+
+		err := cfg.Set(key, value)
+		if err != nil {
+			fmt.Printf("Updated '%s' -> '%s'", key, value)
+		}
+	},
 }
 
 func init() {
@@ -455,5 +488,7 @@ func init() {
 		// More Details
 		docCmd,
 		viewCmd,
+		// Edit Config
+		configCmd,
 	)
 }
