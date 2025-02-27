@@ -70,10 +70,9 @@ func WidthFunc(s string) int {
 }
 
 func DoLog(conn *gorm.DB, query *gorm.DB) {
-
 	var tasks []Do
 
-	if err := query.Find(&tasks).Error; err != nil {
+	if err := query.Preload("Doc").Find(&tasks).Error; err != nil {
 		log.Fatalf("could not fetch tasks: %v", err)
 	}
 
@@ -99,6 +98,11 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 		// Should we join with tag here can display the
 		// tag??
 		for _, task := range tasks {
+			docIndicator := ""
+			if task.Doc.ID != 0 { // If Doc exists, it will have a non-zero ID
+				docIndicator = "+"
+			}
+
 			taskType := fmtDo(task)
 			checkBox := fmtBox(task)
 			prio := fmtPrio(task)
@@ -108,7 +112,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 				task.ID,
 				task.Description,
 				fmtDate(task),
-				"",
+				docIndicator,
 				taskType,
 				prio,
 			)

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -29,19 +28,25 @@ const (
 )
 
 type Do struct {
-	ID          uint      `gorm:"primaryKey"`
-	CreatedAt   time.Time `gorm:"default:current_timestamp"`
+	ID          uint           `gorm:"primaryKey"`
+	CreatedAt   time.Time      `gorm:"default:current_timestamp"`
 	CompletedAt *time.Time
 	Completed   bool           `gorm:"default:false"`
 	Description string         `gorm:"not null"`
 	Type        DoType         `gorm:"type:TEXT;not null"`
 	Priority    DoPrio         `gorm:"type:TEXT;not null;default:medium"`
-	Docs        sql.NullString `gorm:"type:TEXT"`
 	Deleted     bool           `gorm:"default:false"`
+	Doc         DoDoc          `gorm:"foreignKey:DoID"`
 }
 
 func (DoType) GormDataType() string {
 	return "string"
+}
+
+type DoDoc struct {
+	ID   uint   `gorm:"primaryKey"`
+	DoID uint   `gorm:"not null"`
+	Text string `gorm:"type:TEXT;not null"`
 }
 
 type Tag struct {
@@ -63,7 +68,7 @@ func OpenConn(cfg *Config) *gorm.DB {
 		log.Fatalf("could not open database: %v", err)
 	}
 
-	err = conn.AutoMigrate(&Do{}, &Tag{}, &DoTag{})
+	err = conn.AutoMigrate(&Do{}, &Tag{}, &DoTag{}, &DoDoc{})
 	if err != nil {
 		log.Fatalf("could not migrate database: %v", err)
 	}

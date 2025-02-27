@@ -3,10 +3,19 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+)
+
+var (
+	highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 )
 
 var RootCmd = &cobra.Command{
@@ -50,18 +59,20 @@ var didCmd = &cobra.Command{
 		var fetched Do
 
 		result := conn.Where("deleted = ?", false).First(&fetched, id)
-
 		if result.Error != nil {
 			fmt.Printf("No task under %v\n", id)
 			return
 		}
 
-		fetched.Completed = true
-		now := time.Now()
-		fetched.CompletedAt = &now
-		conn.Save(&fetched)
-
-		fmt.Printf("Marked %d as done\n", fetched.ID)
+		if Confirmation(fetched, "Complete this task?", greenStyle) {
+			fetched.Completed = true
+			now := time.Now()
+			fetched.CompletedAt = &now
+			conn.Save(&fetched)
+			fmt.Printf("Marked %d as done\n", fetched.ID)
+		} else {
+			fmt.Println("Task completion cancelled")
+		}
 	},
 }
 
@@ -139,9 +150,13 @@ var scratchCmd = &cobra.Command{
 			return
 		}
 
-		do.Deleted = true
-		conn.Save(&do)
-		fmt.Printf("Deleted do %d\n", do.ID)
+		if Confirmation(do, "Delete this task?", redStyle) {
+			do.Deleted = true
+			conn.Save(&do)
+			fmt.Printf("Deleted do %d\n", do.ID)
+		} else {
+			fmt.Println("Task deletion cancelled")
+		}
 	},
 }
 
@@ -163,9 +178,13 @@ var unscratchCmd = &cobra.Command{
 			return
 		}
 
-		do.Deleted = false
-		conn.Save(&do)
-		fmt.Printf("Resurrected %d\n", do.ID)
+		if Confirmation(do, "Resurrect this task?", redStyle) {
+			do.Deleted = false
+			conn.Save(&do)
+			fmt.Printf("Resurrected %d\n", do.ID)
+		} else {
+			fmt.Println("Task resurrection cancelled")
+		}
 	},
 }
 
@@ -464,18 +483,116 @@ var reassignCmd = &cobra.Command{
 	},
 }
 
-// TODO
 var docCmd = &cobra.Command{
 	Use:   "doc <do_id>",
 	Short: "Document the specifics",
 	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+
+		conn := OpenConn(&cfg)
+
+		var do Do
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		// Create a temporary file
+		tmpfile, err := os.CreateTemp("", "captain-doc-*.md")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer os.Remove(tmpfile.Name())
+
+		// Write existing doc if it exists
+		var existingDoc DoDoc
+		result = conn.Where("do_id = ?", do.ID).First(&existingDoc)
+		if result.Error == nil {
+			tmpfile.WriteString(existingDoc.Text)
+		}
+		tmpfile.Close()
+
+		// Get editor from environment or fallback to vim
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+
+		// Open editor
+		editorCmd := exec.Command(editor, tmpfile.Name())
+		editorCmd.Stdin = os.Stdin
+		editorCmd.Stdout = os.Stdout
+		editorCmd.Stderr = os.Stderr
+		err = editorCmd.Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Read the edited content
+		content, err := os.ReadFile(tmpfile.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Save to database
+		doc := DoDoc{
+			DoID: do.ID,
+			Text: string(content),
+		}
+
+		if result.Error == nil {
+			// Update existing doc
+			existingDoc.Text = string(content)
+			conn.Save(&existingDoc)
+		} else {
+			// Create new doc
+			conn.Create(&doc)
+		}
+
+		fmt.Printf("Documentation saved for task %d\n", do.ID)
+	},
 }
 
-// TODO
 var viewCmd = &cobra.Command{
 	Use:   "view <do_id>",
-	Short: "View the do",
+	Short: "View the do's documentation",
 	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		conn := OpenConn(&cfg)
+
+		var do Do
+		result := conn.Preload("Doc").Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		if do.Doc.ID == 0 {
+			fmt.Printf("No documentation for do %d\n", do.ID)
+			return
+		}
+
+		// Print task details
+		fmt.Printf("Documentation (id=%d): %s\n\n", do.ID, highlightStyle.Render(do.Description))
+		fmt.Println(strings.Repeat("-", 40))
+
+		// Initialize glamour renderer
+		r, _ := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(80),
+		)
+
+		out, err := r.Render(do.Doc.Text)
+		if err != nil {
+			fmt.Printf("Error rendering markdown: %v\n", err)
+			return
+		}
+
+		fmt.Print(out)
+	},
 }
 
 var configCmd = &cobra.Command{
