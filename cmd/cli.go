@@ -172,32 +172,53 @@ var unscratchCmd = &cobra.Command{
 	},
 }
 
-var logCmd = &cobra.Command{
-	Use:   "log --include-done --sort=created_at",
-	Short: "Log tasks",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := LoadConfig()
-		conn := OpenConn(&cfg)
-		// cmd.Flags().Bool("include-done", false, "Include completed tasks")
-		// cmd.Flags().String("sort", "created_at", "Sort tasks by the specifics")
-		n, _ := cmd.Flags().GetInt("n")
+var All bool
 
-		// includeDone, _ := cmd.Flags().GetBool("include-done")
-		// sortField, _ := cmd.Flags().GetString("sort")
-		// --target
-		// --sort
-		// Fetching by type
-		// --type
+func SprintfFunc(format string) func(string) string {
+	return func(value string) string {
+		return fmt.Sprintf(format, value)
+	}
+}
 
-		// How do we handle these?
-		// --include-done
-		// --done
-		oneWeekAgo := time.Now().AddDate(0, 0, -7)
+func DoOrder(sortby string, orderby string) string {
+	// DESC / ASC
+	var so string
 
-		query := conn
-		query = query.Not("deleted = ?", true).
-			Where("completed_at IS NULL OR completed_at >= ?", oneWeekAgo).
-			Limit(n).Order(`
+	switch orderby {
+	case "asc":
+		so = "%s " + "ASC"
+	default:
+		if orderby != "desc" {
+			fmt.Printf("No such order: '%s'!\n", orderby)
+		}
+		so = "%s " + "DESC"
+	}
+
+	sortOrder := SprintfFunc(so)
+
+	switch sortby {
+	case "created_at":
+		return sortOrder("created_at")
+	case "completed_at":
+		return sortOrder("completed_at")
+	case "description":
+		return sortOrder("description")
+	case "type":
+		return sortOrder("type")
+	case "priority":
+		return sortOrder(`
+			CASE priority
+				WHEN 'high' THEN 1
+				WHEN 'medium' THEN 2
+				WHEN 'low' THEN 3
+				ELSE 2
+			END
+		`)
+	default:
+		if sortby != "default" {
+			fmt.Printf("No such sort: '%s'!\n", orderby)
+		}
+		return `
 			completed,
 			CASE priority
 				WHEN 'high' THEN 1
@@ -205,7 +226,32 @@ var logCmd = &cobra.Command{
 				WHEN 'low' THEN 3
 				ELSE 2
 			END, created_at DESC
-		`)
+		`
+	}
+}
+
+var logCmd = &cobra.Command{
+	Use:   "log --include-done --sort=created_at",
+	Short: "Log tasks",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg := LoadConfig()
+		conn := OpenConn(&cfg)
+		// cmd.Flags().Bool("include-done", false, "Include completed tasks")
+		n, _ := cmd.Flags().GetInt("n")
+		sort, _ := cmd.Flags().GetString("sort")
+		order, _ := cmd.Flags().GetString("order")
+
+		// --target = recruit
+		// Fetching by type
+		// --type = brag
+
+		// How do we handle these?
+		// --not-done
+		query := conn.Not("deleted = ?", true).Limit(n).Order(DoOrder(sort, order))
+		if !All {
+			oneWeekAgo := time.Now().AddDate(0, 0, -7)
+			query = query.Where("completed_at IS NULL OR completed_at >= ?", oneWeekAgo)
+		}
 
 		DoLog(conn, query)
 	},
@@ -257,6 +303,11 @@ var recruitCmd = &cobra.Command{
 	},
 }
 
+type Mate struct {
+	Name  string
+	Count int64
+}
+
 var crewCmd = &cobra.Command{
 	Use:   "crew",
 	Short: "List the crew",
@@ -264,10 +315,7 @@ var crewCmd = &cobra.Command{
 		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
-		var crew []struct {
-			Name  string
-			Count int64
-		}
+		var crew []Mate
 
 		result := conn.Table("tags").
 			Select("tags.name, COUNT(do_tags.tag_id) AS count").
@@ -281,10 +329,7 @@ var crewCmd = &cobra.Command{
 			return
 		}
 
-		// TODO: This can look much nicer.
-		for _, mate := range crew {
-			fmt.Printf("Mate: '%s', count: '%d'\n", mate.Name, mate.Count)
-		}
+		CrewLog(crew)
 	},
 }
 
@@ -464,6 +509,9 @@ var configCmd = &cobra.Command{
 
 func init() {
 	logCmd.Flags().IntP("n", "n", 10, "Limit the number of dos outstanding")
+	logCmd.Flags().StringP("sort", "s", "default", "Set the sort")
+	logCmd.Flags().StringP("order", "o", "desc", "Set the order")
+	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")
 
 	RootCmd.AddCommand(
 		doCmd,

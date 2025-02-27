@@ -106,3 +106,20 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 		tbl.Print()
 	}
 }
+
+func CrewLog(crew []Mate) {
+	if len(crew) == 0 {
+		fmt.Println("We've got no crew!")
+		return
+	}
+
+	tbl := table.New("name", "count")
+	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+	tbl.WithHeaderFormatter(headerFmt)
+
+	for _, mate := range crew {
+		tbl.AddRow(mate.Name, mate.Count)
+	}
+
+	tbl.Print()
+}
