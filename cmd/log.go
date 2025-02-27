@@ -48,6 +48,17 @@ func fmtPrio(task Do) string {
 	}
 }
 
+func fmtDate(task Do) string {
+	date := task.CreatedAt
+	colour := color.New(color.FgHiBlack)
+	if task.Completed {
+		date = *task.CompletedAt
+		colour = color.New(color.Underline)
+	}
+
+	return colour.Sprintf("%s", date.Format("02-Jan-06 15:04"))
+}
+
 var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func stripANSI(s string) string {
@@ -70,7 +81,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 		fmt.Println("No tasks found.")
 	} else {
 		// Header
-		tbl := table.New("", "", "do", "did at", "doc", "type", "prio")
+		tbl := table.New("", "", "do", "at", "doc", "type", "prio")
 		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 		tbl.WithHeaderFormatter(headerFmt)
 
@@ -96,7 +107,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 				checkBox,
 				task.ID,
 				task.Description,
-				task.CreatedAt.Format("02-Jan-06 15:04"),
+				fmtDate(task),
 				"",
 				taskType,
 				prio,

@@ -7,9 +7,14 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+type IniConfig struct {
+	Profile string `ini:"profile"`
+}
+
 type Config struct {
-	DBFile     string `ini:"dbname"`
-	CaptainDir string
+	DBFile       string `ini:"dbname"`
+	LookBackDays int    `ini:"lookback_days"`
+	CaptainDir   string
 }
 
 func (cfg *Config) Set(key string, value string) error {
@@ -41,22 +46,46 @@ func LoadConfig() Config {
 		panic("failed to create directory")
 	}
 
-	// Default values
-	cfg := Config{DBFile: "testdo.db", CaptainDir: capDir}
-
 	cfgFile := fmt.Sprintf("%s/config.ini", capDir)
+
+	// Default profile configuration
+	iniCfg := IniConfig{Profile: "main"}
+
+	// Default config values
+	cfg := Config{
+		DBFile:       "testdo.db",
+		LookBackDays: 7,
+		CaptainDir:   capDir,
+	}
+
+	// If config file exists, try to load it
+	var file *ini.File
 	if _, err := os.Stat(cfgFile); err == nil {
-		file, _ := ini.Load(cfgFile)
-		err = file.Section("").MapTo(&cfg)
+		// Load existing file to preserve other profiles
+		file, err = ini.Load(cfgFile)
 		if err != nil {
-			panic("Failed mapping config values")
+			panic("Failed to load config file")
+		}
+	} else {
+		// Create new file if it doesn't exist
+		file = ini.Empty()
+	}
+
+	// Load profile from root section
+	err = file.Section("").MapTo(&iniCfg)
+	if err == nil {
+		// Try to load config from the specified profile
+		err = file.Section(iniCfg.Profile).MapTo(&cfg)
+		if err != nil {
+			// Profile doesn't exist, will create it with defaults
+			fmt.Printf("Profile '%s' not found, creating with defaults\n", iniCfg.Profile)
 		}
 	}
 
-	file := ini.Empty()
-	section := file.Section("")
-
-	err = section.ReflectFrom(&cfg)
+	// Save the profile in root section
+	file.Section("").ReflectFrom(&iniCfg)
+	// Save the config values in profile section
+	err = file.Section(iniCfg.Profile).ReflectFrom(&cfg)
 	if err != nil {
 		panic("Error reflecting config values")
 	}

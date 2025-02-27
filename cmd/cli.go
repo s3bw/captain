@@ -14,6 +14,8 @@ var RootCmd = &cobra.Command{
 	Short: "Task manager CLI",
 }
 
+var cfg = LoadConfig()
+
 var doCmd = &cobra.Command{
 	Use:   "do <message>",
 	Short: "Add a new do",
@@ -21,7 +23,6 @@ var doCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		do := Do{
@@ -44,7 +45,6 @@ var didCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var fetched Do
@@ -91,7 +91,6 @@ var setPrioCmd = &cobra.Command{
 		value := args[1]
 		id := args[2]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var do Do
@@ -130,7 +129,6 @@ var scratchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var do Do
@@ -154,7 +152,6 @@ var unscratchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var do Do
@@ -234,7 +231,6 @@ var logCmd = &cobra.Command{
 	Use:   "log --include-done --sort=created_at",
 	Short: "Log tasks",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 		// cmd.Flags().Bool("include-done", false, "Include completed tasks")
 		n, _ := cmd.Flags().GetInt("n")
@@ -249,8 +245,8 @@ var logCmd = &cobra.Command{
 		// --not-done
 		query := conn.Not("deleted = ?", true).Limit(n).Order(DoOrder(sort, order))
 		if !All {
-			oneWeekAgo := time.Now().AddDate(0, 0, -7)
-			query = query.Where("completed_at IS NULL OR completed_at >= ?", oneWeekAgo)
+			lookBack := time.Now().AddDate(0, 0, -cfg.LookBackDays)
+			query = query.Where("completed_at IS NULL OR completed_at >= ?", lookBack)
 		}
 
 		DoLog(conn, query)
@@ -261,7 +257,6 @@ var todayCmd = &cobra.Command{
 	Use:   "today",
 	Short: "Log tasks done today",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		oneDayAgo := time.Now().AddDate(0, 0, -1)
@@ -288,7 +283,6 @@ var recruitCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		newTag := Tag{
@@ -312,7 +306,6 @@ var crewCmd = &cobra.Command{
 	Use:   "crew",
 	Short: "List the crew",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var crew []Mate
@@ -341,7 +334,6 @@ var renameCmd = &cobra.Command{
 		oldName := args[0]
 		newName := args[1]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var tag Tag
@@ -369,7 +361,6 @@ var askCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		do := &Do{Description: message, Type: Ask}
@@ -395,7 +386,6 @@ var tellCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		do := &Do{Description: message, Type: Tell}
@@ -420,7 +410,6 @@ var bragCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		now := time.Now()
@@ -447,7 +436,6 @@ var reassignCmd = &cobra.Command{
 		id := args[0]
 		name := args[1]
 
-		cfg := LoadConfig()
 		conn := OpenConn(&cfg)
 
 		var do Do
@@ -497,8 +485,6 @@ var configCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
 		value := args[1]
-
-		cfg := LoadConfig()
 
 		err := cfg.Set(key, value)
 		if err != nil {
