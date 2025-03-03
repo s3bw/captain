@@ -436,15 +436,30 @@ var askCmd = &cobra.Command{
 
 		conn := OpenConn(&cfg)
 
-		do := &Do{Description: message, Type: Ask}
-		tag := &Tag{Name: name}
+		// First create or find the tag
+		var tag Tag
+		result := conn.Where("name = ?", name).First(&tag)
+		if result.Error != nil {
+			// Create new tag if it doesn't exist
+			tag = Tag{Name: name}
+			if err := conn.Create(&tag).Error; err != nil {
+				log.Fatalf("could not create tag: %v", err)
+			}
+		}
 
-		conn.Create(&do)
-		conn.Create(&tag)
+		// Create the ask task
+		do := Do{
+			Description: message,
+			Type:        Ask,
+		}
+		if err := conn.Create(&do).Error; err != nil {
+			log.Fatalf("could not create ask task: %v", err)
+		}
 
+		// Create the relationship
 		doTag := DoTag{DoID: do.ID, TagID: tag.ID}
 		if err := conn.Create(&doTag).Error; err != nil {
-			log.Fatalf("could not insert new row: %v", err)
+			log.Fatalf("could not create do-tag relationship: %v", err)
 		}
 
 		fmt.Printf("Let's ask %s (id=%d)\n", name, do.ID)
@@ -461,15 +476,30 @@ var tellCmd = &cobra.Command{
 
 		conn := OpenConn(&cfg)
 
-		do := &Do{Description: message, Type: Tell}
-		tag := &Tag{Name: name}
+		// First create or find the tag
+		var tag Tag
+		result := conn.Where("name = ?", name).First(&tag)
+		if result.Error != nil {
+			// Create new tag if it doesn't exist
+			tag = Tag{Name: name}
+			if err := conn.Create(&tag).Error; err != nil {
+				log.Fatalf("could not create tag: %v", err)
+			}
+		}
 
-		conn.Create(&do)
-		conn.Create(&tag)
+		// Create the tell task
+		do := Do{
+			Description: message,
+			Type:        Tell,
+		}
+		if err := conn.Create(&do).Error; err != nil {
+			log.Fatalf("could not create tell task: %v", err)
+		}
 
+		// Create the relationship
 		doTag := DoTag{DoID: do.ID, TagID: tag.ID}
 		if err := conn.Create(&doTag).Error; err != nil {
-			log.Fatalf("could not insert new row: %v", err)
+			log.Fatalf("could not create do-tag relationship: %v", err)
 		}
 
 		fmt.Printf("Let's tell %s (id=%d)\n", name, do.ID)

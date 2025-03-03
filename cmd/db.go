@@ -39,6 +39,7 @@ type Do struct {
 	Priority    DoPrio         `gorm:"type:TEXT;not null;default:medium"`
 	Deleted     bool           `gorm:"default:false"`
 	Doc         DoDoc          `gorm:"foreignKey:DoID"`
+	Tags        []Tag          `gorm:"many2many:do_tags;"`
 }
 
 func (DoType) GormDataType() string {
@@ -57,8 +58,10 @@ type Tag struct {
 }
 
 type DoTag struct {
-	DoID  uint `gorm:"not null"`
-	TagID uint `gorm:"not null"`
+	DoID  uint `gorm:"primaryKey;not null"`
+	TagID uint `gorm:"primaryKey;not null"`
+	Do    Do   `gorm:"foreignKey:DoID"`
+	Tag   Tag  `gorm:"foreignKey:TagID"`
 }
 
 func OpenConn(cfg *Config) *gorm.DB {

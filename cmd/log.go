@@ -74,7 +74,7 @@ func WidthFunc(s string) int {
 func DoLog(conn *gorm.DB, query *gorm.DB) {
 	var tasks []Do
 
-	if err := query.Preload("Doc").Find(&tasks).Error; err != nil {
+	if err := query.Preload("Doc").Preload("Tags").Find(&tasks).Error; err != nil {
 		log.Fatalf("could not fetch tasks: %v", err)
 	}
 
@@ -82,7 +82,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 		fmt.Println("No tasks found.")
 	} else {
 		// Header
-		tbl := table.New("", "", "do", "at", "doc", "type", "prio")
+		tbl := table.New("", "", "do", "at", "doc", "type", "prio", "for")
 		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 		tbl.WithHeaderFormatter(headerFmt)
 
@@ -97,12 +97,15 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 
 		tbl.WithWidthFunc(WidthFunc)
 
-		// Should we join with tag here can display the
-		// tag??
 		for _, task := range tasks {
 			docIndicator := ""
 			if task.Doc.ID != 0 { // If Doc exists, it will have a non-zero ID
 				docIndicator = "+"
+			}
+
+			tag := ""
+			if len(task.Tags) > 0 {
+				tag = task.Tags[0].Name
 			}
 
 			taskType := fmtDo(task)
@@ -117,6 +120,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 				docIndicator,
 				taskType,
 				prio,
+				tag,
 			)
 		}
 
