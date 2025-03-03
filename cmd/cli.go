@@ -106,7 +106,7 @@ var setPrioCmd = &cobra.Command{
 
 		var do Do
 
-		result := conn.Not("deleted = ?", false).First(&do, id)
+		result := conn.Where("deleted = ?", false).First(&do, id)
 		if result.Error != nil {
 			fmt.Printf("No do with ID '%v'\n", id)
 			return
@@ -117,19 +117,18 @@ var setPrioCmd = &cobra.Command{
 		do.Priority = mapPriority(value)
 		conn.Save(&do)
 
-		fmt.Printf("Do %v updated '%v' -> '%v'\n", field, oldPrio, do.Priority)
+		fmt.Printf("Do %v updated '%v' -> '%v'\n", id, oldPrio, do.Priority)
 	},
 }
 
 // TODO
 var editCmd = &cobra.Command{
-	Use:   "edit <do_id> <new_message>",
+	Use:   "edit <do_id>",
 	Short: "Edit a task by ID",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		id := args[0]
-		newMessage := args[1]
-		fmt.Printf("Edited task %s: %s\n", id, newMessage)
+		// id := args[0]
+		// fmt.Printf("Edited task %s: %s\n", id, newMessage)
 	},
 }
 
@@ -144,7 +143,7 @@ var scratchCmd = &cobra.Command{
 
 		var do Do
 
-		result := conn.Not("deleted = ?", true).First(&do, id)
+		result := conn.Where("deleted = ?", false).First(&do, id)
 		if result.Error != nil {
 			fmt.Printf("No do under id '%v'\n", id)
 			return
@@ -185,6 +184,50 @@ var unscratchCmd = &cobra.Command{
 		} else {
 			fmt.Println("Task resurrection cancelled")
 		}
+	},
+}
+
+var pinCmd = &cobra.Command{
+	Use:   "pin <do_id>",
+	Short: "Pin a do",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		conn := OpenConn(&cfg)
+
+		var do Do
+
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		do.Pinned = true
+		conn.Save(&do)
+		fmt.Printf("Pinned do %d\n", do.ID)
+	},
+}
+
+var unpinCmd = &cobra.Command{
+	Use:   "unpin <do_id>",
+	Short: "Unpin a do",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		conn := OpenConn(&cfg)
+
+		var do Do
+
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		do.Pinned = false
+		conn.Save(&do)
+		fmt.Printf("Unpinned do %d\n", do.ID)
 	},
 }
 
@@ -267,6 +310,17 @@ var logCmd = &cobra.Command{
 			lookBack := time.Now().AddDate(0, 0, -cfg.LookBackDays)
 			query = query.Where("completed_at IS NULL OR completed_at >= ?", lookBack)
 		}
+
+		DoLog(conn, query)
+	},
+}
+
+var pinnedCmd = &cobra.Command{
+	Use:   "pinned",
+	Short: "Log pinned tasks",
+	Run: func(cmd *cobra.Command, args []string) {
+		conn := OpenConn(&cfg)
+		query := conn.Where("pinned = ? AND deleted = ?", true, false).Order("created_at DESC")
 
 		DoLog(conn, query)
 	},
@@ -447,6 +501,30 @@ var bragCmd = &cobra.Command{
 	},
 }
 
+var learnCmd = &cobra.Command{
+	Use:   "learn <message>",
+	Short: "Set learn for something",
+	Long:  "Set a task to cover dealing with certain topics in which you'd like to improve at",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		message := args[0]
+
+		conn := OpenConn(&cfg)
+
+		do := Do{
+			Description: message,
+			Type:        Learn,
+			Completed:   false,
+		}
+
+		if err := conn.Create(&do).Error; err != nil {
+			log.Fatalf("could not insert new row: %v", err)
+		}
+
+		fmt.Printf("Added learn: (id=%d)\n", do.ID)
+	},
+}
+
 var reassignCmd = &cobra.Command{
 	Use:   "reassign <do_id> <name>",
 	Short: "Reassign the do to someone else.",
@@ -512,6 +590,7 @@ var docCmd = &cobra.Command{
 		if result.Error == nil {
 			tmpfile.WriteString(existingDoc.Text)
 		}
+		// tmpfile.WriteString("\n# vim: set textwidth=80\n")
 		tmpfile.Close()
 
 		// Get editor from environment or fallback to vim
@@ -544,14 +623,22 @@ var docCmd = &cobra.Command{
 
 		if result.Error == nil {
 			// Update existing doc
-			existingDoc.Text = string(content)
-			conn.Save(&existingDoc)
+			if len(strings.TrimSpace(string(content))) == 0 {
+				// If content is empty, delete the doc
+				conn.Delete(&existingDoc)
+				fmt.Printf("Documentation deleted for task %d\n", do.ID)
+			} else {
+				existingDoc.Text = string(content)
+				conn.Save(&existingDoc)
+				fmt.Printf("Documentation updated for task %d\n", do.ID)
+			}
 		} else {
-			// Create new doc
-			conn.Create(&doc)
+			// Create new doc only if content is not empty
+			if len(strings.TrimSpace(string(content))) > 0 {
+				conn.Create(&doc)
+				fmt.Printf("Documentation saved for task %d\n", do.ID)
+			}
 		}
-
-		fmt.Printf("Documentation saved for task %d\n", do.ID)
 	},
 }
 
@@ -623,9 +710,12 @@ func init() {
 		unscratchCmd,
 		setPrioCmd,
 		editCmd,
+		pinCmd,
+		unpinCmd,
 		// Views
 		logCmd,
 		todayCmd,
+		pinnedCmd,
 		// Crew Commands
 		// - manage
 		recruitCmd,
@@ -634,8 +724,10 @@ func init() {
 		// - assignment
 		askCmd,
 		tellCmd,
-		bragCmd,
 		reassignCmd,
+		// - personal development
+		bragCmd,
+		learnCmd,
 		// More Details
 		docCmd,
 		viewCmd,
