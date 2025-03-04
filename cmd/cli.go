@@ -720,15 +720,25 @@ var configCmd = &cobra.Command{
 		key := args[0]
 		value := args[1]
 
-		err := cfg.Set(key, value)
-		if err != nil {
-			fmt.Printf("Updated '%s' -> '%s'", key, value)
+		var err error
+		if key == "profile" {
+			// Update the profile name in the root section
+			err = cfg.Set(key, value)
+		} else {
+			// Update the setting in the current profile section
+			err = cfg.SetProfile(key, value)
 		}
+
+		if err != nil {
+			fmt.Printf("Error updating config: %v\n", err)
+			return
+		}
+		fmt.Printf("Updated '%s' -> '%s'\n", key, value)
 	},
 }
 
 func init() {
-	logCmd.Flags().IntP("n", "n", 10, "Limit the number of dos outstanding")
+	logCmd.Flags().IntP("n", "n", cfg.LogLength, "Limit the number of dos outstanding")
 	logCmd.Flags().StringP("sort", "s", "default", "Set the sort")
 	logCmd.Flags().StringP("order", "o", "desc", "Set the order")
 	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")

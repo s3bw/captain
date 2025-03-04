@@ -14,6 +14,7 @@ type IniConfig struct {
 type Config struct {
 	DBFile       string `ini:"dbname"`
 	LookBackDays int    `ini:"lookback_days"`
+	LogLength    int    `ini:"log_length"`
 	CaptainDir   string
 }
 
@@ -55,6 +56,7 @@ func LoadConfig() Config {
 	cfg := Config{
 		DBFile:       "testdo.db",
 		LookBackDays: 7,
+		LogLength:    10,
 		CaptainDir:   capDir,
 	}
 
@@ -96,4 +98,35 @@ func LoadConfig() Config {
 	}
 
 	return cfg
+}
+
+// SetProfile sets a value in the current profile section
+func (c *Config) SetProfile(key, value string) error {
+	cfgFile := fmt.Sprintf("%s/config.ini", c.CaptainDir)
+
+	file, err := ini.LooseLoad(cfgFile)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Get current profile from root section
+	profile := file.Section("").Key("profile").String()
+	if profile == "" {
+		return fmt.Errorf("no profile selected")
+	}
+
+	// Ensure the profile section exists
+	if !file.HasSection(profile) {
+		file.NewSection(profile)
+	}
+
+	// Set the value in the profile section
+	file.Section(profile).Key(key).SetValue(value)
+
+	err = file.SaveTo(cfgFile)
+	if err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	return nil
 }
