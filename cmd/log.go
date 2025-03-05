@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-runewidth"
@@ -71,7 +72,7 @@ func WidthFunc(s string) int {
 	return runewidth.StringWidth(stripANSI(s))
 }
 
-func DoLog(conn *gorm.DB, query *gorm.DB) {
+func DoLog(conn *gorm.DB, query *gorm.DB, unhide bool) {
 	var tasks []Do
 
 	if err := query.Preload("Doc").Preload("Tags").Find(&tasks).Error; err != nil {
@@ -112,10 +113,15 @@ func DoLog(conn *gorm.DB, query *gorm.DB) {
 			checkBox := fmtBox(task)
 			prio := fmtPrio(task)
 
+			description := task.Description
+			if task.Sensitive && !unhide {
+				description = strings.Repeat("⠿", len(task.Description))
+			}
+
 			tbl.AddRow(
 				checkBox,
 				task.ID,
-				task.Description,
+				description,
 				fmtDate(task),
 				docIndicator,
 				taskType,

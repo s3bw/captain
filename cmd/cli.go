@@ -231,6 +231,59 @@ var unpinCmd = &cobra.Command{
 	},
 }
 
+var markCmd = &cobra.Command{
+	Use:   "mark <do_id> <field>",
+	Short: "Mark a do as sensitive",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		field := args[1]
+
+		conn := OpenConn(&cfg)
+
+		var do Do
+
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+		switch field {
+		case "sensitive":
+			do.Sensitive = true
+		}
+		conn.Save(&do)
+		fmt.Printf("Marked %d as %s\n", do.ID, field)
+	},
+}
+
+var unmarkCmd = &cobra.Command{
+	Use:   "unmark <do_id> <field>",
+	Short: "Unmark a do as sensitive",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		field := args[1]
+
+		conn := OpenConn(&cfg)
+
+		var do Do
+
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		switch field {
+		case "sensitive":
+			do.Sensitive = false
+		}
+		conn.Save(&do)
+		fmt.Printf("Unmarked %d as %s\n", do.ID, field)
+	},
+}
+
 var All bool
 
 func SprintfFunc(format string) func(string) string {
@@ -290,7 +343,7 @@ func DoOrder(sortby string, orderby string) string {
 }
 
 var logCmd = &cobra.Command{
-	Use:   "log --include-done --sort=created_at",
+	Use:   "log --include-done --sort=created_at --unhide",
 	Short: "Log tasks",
 	Run: func(cmd *cobra.Command, args []string) {
 		conn := OpenConn(&cfg)
@@ -298,7 +351,7 @@ var logCmd = &cobra.Command{
 		n, _ := cmd.Flags().GetInt("n")
 		sort, _ := cmd.Flags().GetString("sort")
 		order, _ := cmd.Flags().GetString("order")
-
+		unhide, _ := cmd.Flags().GetBool("unhide")
 		// --target = recruit
 		// Fetching by type
 		// --type = brag
@@ -311,7 +364,7 @@ var logCmd = &cobra.Command{
 			query = query.Where("completed_at IS NULL OR completed_at >= ?", lookBack)
 		}
 
-		DoLog(conn, query)
+		DoLog(conn, query, unhide)
 	},
 }
 
@@ -322,16 +375,16 @@ var pinnedCmd = &cobra.Command{
 		conn := OpenConn(&cfg)
 		query := conn.Where("pinned = ? AND deleted = ?", true, false).Order("created_at DESC")
 
-		DoLog(conn, query)
+		DoLog(conn, query, false)
 	},
 }
 
 var todayCmd = &cobra.Command{
-	Use:   "today",
+	Use:   "today --unhide",
 	Short: "Log tasks done today",
 	Run: func(cmd *cobra.Command, args []string) {
 		conn := OpenConn(&cfg)
-
+		unhide, _ := cmd.Flags().GetBool("unhide")
 		oneDayAgo := time.Now().AddDate(0, 0, -1)
 
 		query := conn
@@ -346,7 +399,7 @@ var todayCmd = &cobra.Command{
 				ELSE 2
 			END, created_at DESC
 		`)
-		DoLog(conn, query)
+		DoLog(conn, query, unhide)
 	},
 }
 
@@ -620,7 +673,6 @@ var docCmd = &cobra.Command{
 		if result.Error == nil {
 			tmpfile.WriteString(existingDoc.Text)
 		}
-		// tmpfile.WriteString("\n# vim: set textwidth=80\n")
 		tmpfile.Close()
 
 		// Get editor from environment or fallback to vim
@@ -742,6 +794,7 @@ func init() {
 	logCmd.Flags().StringP("sort", "s", "default", "Set the sort")
 	logCmd.Flags().StringP("order", "o", "desc", "Set the order")
 	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")
+	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")
 
 	RootCmd.AddCommand(
 		doCmd,
@@ -750,8 +803,11 @@ func init() {
 		unscratchCmd,
 		setPrioCmd,
 		editCmd,
+		// Attributes
 		pinCmd,
 		unpinCmd,
+		markCmd,
+		unmarkCmd,
 		// Views
 		logCmd,
 		todayCmd,

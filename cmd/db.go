@@ -34,6 +34,7 @@ type Do struct {
 	CompletedAt *time.Time
 	Completed   bool           `gorm:"default:false"`
 	Pinned      bool           `gorm:"default:false"`
+	Sensitive   bool           `gorm:"default:false"`
 	Description string         `gorm:"not null"`
 	Type        DoType         `gorm:"type:TEXT;not null"`
 	Priority    DoPrio         `gorm:"type:TEXT;not null;default:medium"`
