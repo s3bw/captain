@@ -634,12 +634,16 @@ var reassignCmd = &cobra.Command{
 			return
 		}
 
+		// Delete any existing assignments for this do
+		if err := conn.Where("do_id = ?", do.ID).Delete(&DoTag{}).Error; err != nil {
+			log.Fatalf("could not delete existing assignments: %v", err)
+		}
+
 		doTag := DoTag{DoID: do.ID, TagID: tag.ID}
 		if err := conn.Create(&doTag).Error; err != nil {
 			log.Fatalf("could not insert new row: %v", err)
 		}
 
-		conn.Save(&doTag)
 		fmt.Printf("We've reassigned the do to '%s'\n", name)
 	},
 }
