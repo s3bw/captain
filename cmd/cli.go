@@ -343,22 +343,36 @@ func DoOrder(sortby string, orderby string) string {
 }
 
 var logCmd = &cobra.Command{
-	Use:   "log --include-done --sort=created_at --unhide",
+	Use:   "log --include-done --sort=created_at --unhide --for=<tag.name> --type=<type>",
 	Short: "Log tasks",
 	Run: func(cmd *cobra.Command, args []string) {
 		conn := OpenConn(&cfg)
-		// cmd.Flags().Bool("include-done", false, "Include completed tasks")
 		n, _ := cmd.Flags().GetInt("n")
 		sort, _ := cmd.Flags().GetString("sort")
 		order, _ := cmd.Flags().GetString("order")
 		unhide, _ := cmd.Flags().GetBool("unhide")
-		// --target = recruit
-		// Fetching by type
-		// --type = brag
+		forTag, _ := cmd.Flags().GetString("for")
+		doType, _ := cmd.Flags().GetString("type")
 
-		// How do we handle these?
-		// --not-done
-		query := conn.Not("deleted = ?", true).Limit(n).Order(DoOrder(sort, order))
+		query := conn.Not("deleted = ?", true)
+
+		// Apply tag filter if specified
+		fmt.Printf("forTag: %s\n", forTag)
+		if forTag != "" {
+			query = query.
+				Joins("LEFT JOIN do_tags ON do_tags.do_id = dos.id").
+				Joins("LEFT JOIN tags ON tags.id = do_tags.tag_id").
+				Where("tags.name = ?", forTag)
+		}
+
+		// Apply type filter if specified
+		fmt.Printf("doType: %s\n", doType)
+		if doType != "" {
+			query = query.Where("type = ?", doType)
+		}
+
+		query = query.Limit(n).Order(DoOrder(sort, order))
+		
 		if !All {
 			lookBack := time.Now().AddDate(0, 0, -cfg.LookBackDays)
 			query = query.Where("completed_at IS NULL OR completed_at >= ?", lookBack)
@@ -795,10 +809,12 @@ var configCmd = &cobra.Command{
 
 func init() {
 	logCmd.Flags().IntP("n", "n", cfg.LogLength, "Limit the number of dos outstanding")
-	logCmd.Flags().StringP("sort", "s", "default", "Set the sort")
-	logCmd.Flags().StringP("order", "o", "desc", "Set the order")
+	logCmd.Flags().StringP("sort", "s", "default", "Set the sort (created_at/completed_at/priority)")
+	logCmd.Flags().StringP("order", "o", "desc", "Set the order (asc/desc)")
 	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")
 	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")
+	logCmd.Flags().String("for", "", "Filter tasks for a specific tag/person")
+	logCmd.Flags().String("type", "", "Filter tasks by type (task/ask/tell/brag/learn)")
 
 	RootCmd.AddCommand(
 		doCmd,
