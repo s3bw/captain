@@ -16,8 +16,8 @@ Do Types:
 
 ```
        do                            at               doc  type   prio    for
-☐  4   ⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿  22-Jan-25 22:36  +    tell   high
-☐  16  ⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿                  03-Mar-25 20:34       tell   medium  alice
+☐  4   ⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿  22-Jan-25 22:36  +    tell   high
+☐  16  ⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿                   03-Mar-25 20:34       tell   medium  alice
 ☐  13  How to deal with stress       03-Mar-25 12:26       learn  medium
 ☐  10  I need to complete this       27-Feb-25 21:28  +    task   low
 ▣  15  How do we do this?            03-Mar-25 20:34       tell   medium  alice
@@ -54,7 +54,13 @@ $ captain unscratch <do.id>
 Set priority
 
 ```
-$ captain set prio <high/med/low>
+$ captain set prio <high/med/low> <do.id>
+```
+
+Set type
+
+```
+$ captain set type <task/ask/tell/learn/brag/PR/meta> <do.id>
 ```
 
 ### Attributes

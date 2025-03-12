@@ -13,11 +13,13 @@ import (
 type DoType string
 
 const (
-	Task DoType = "task"
-	Ask  DoType = "ask"
-	Tell DoType = "tell"
-	Brag DoType = "brag"
+	Task  DoType = "task"
+	Ask   DoType = "ask"
+	Tell  DoType = "tell"
+	Brag  DoType = "brag"
 	Learn DoType = "learn"
+	PR    DoType = "PR"
+	Meta  DoType = "meta"
 )
 
 type DoPrio string
@@ -29,18 +31,18 @@ const (
 )
 
 type Do struct {
-	ID          uint           `gorm:"primaryKey"`
-	CreatedAt   time.Time      `gorm:"default:current_timestamp"`
+	ID          uint      `gorm:"primaryKey"`
+	CreatedAt   time.Time `gorm:"default:current_timestamp"`
 	CompletedAt *time.Time
-	Completed   bool           `gorm:"default:false"`
-	Pinned      bool           `gorm:"default:false"`
-	Sensitive   bool           `gorm:"default:false"`
-	Description string         `gorm:"not null"`
-	Type        DoType         `gorm:"type:TEXT;not null"`
-	Priority    DoPrio         `gorm:"type:TEXT;not null;default:medium"`
-	Deleted     bool           `gorm:"default:false"`
-	Doc         DoDoc          `gorm:"foreignKey:DoID"`
-	Tags        []Tag          `gorm:"many2many:do_tags;"`
+	Completed   bool   `gorm:"default:false"`
+	Pinned      bool   `gorm:"default:false"`
+	Sensitive   bool   `gorm:"default:false"`
+	Description string `gorm:"not null"`
+	Type        DoType `gorm:"type:TEXT;not null"`
+	Priority    DoPrio `gorm:"type:TEXT;not null;default:medium"`
+	Deleted     bool   `gorm:"default:false"`
+	Doc         DoDoc  `gorm:"foreignKey:DoID"`
+	Tags        []Tag  `gorm:"many2many:do_tags;"`
 }
 
 func (DoType) GormDataType() string {

@@ -24,6 +24,10 @@ func fmtDo(task Do) string {
 		return color.New(color.FgMagenta).Sprintf("brag")
 	case Learn:
 		return color.New(color.FgCyan).Sprintf("learn")
+	case PR:
+		return color.New(color.FgHiRed).Sprintf("PR")
+	case Meta:
+		return color.New(color.FgCyan).Sprintf("meta")
 	default:
 		return "unknown"
 	}

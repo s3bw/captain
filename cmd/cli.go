@@ -34,6 +34,14 @@ var doCmd = &cobra.Command{
 
 		conn := OpenConn(&cfg)
 
+		// Query for existing do, case insensitive
+		var existing Do
+		result := conn.Where("LOWER(description) = ?", strings.ToLower(message)).First(&existing)
+		if result.Error == nil {
+			fmt.Printf("Do already exists: %d\n", existing.ID)
+			return
+		}
+
 		do := Do{
 			Description: message,
 			Type:        Task,
@@ -89,16 +97,37 @@ func mapPriority(s string) DoPrio {
 	}
 }
 
+func mapType(s string) DoType {
+	switch s {
+	case "task":
+		return Task
+	case "ask":
+		return Ask
+	case "tell":
+		return Tell
+	case "brag":
+		return Brag
+	case "learn":
+		return Learn
+	case "pr", "PR":
+		return PR
+	case "meta":
+		return Meta
+	}
+	return Task
+}
+
 var setPrioCmd = &cobra.Command{
 	Use:   "set <field> <value> <do_id>",
 	Short: "Changes something of a do, right now just priority",
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		field := args[0]
-		if field != "prio" {
+		if field != "prio" && field != "type" {
 			fmt.Printf("The field '%s' is not supported.", field)
 			return
 		}
+
 		value := args[1]
 		id := args[2]
 
@@ -112,23 +141,82 @@ var setPrioCmd = &cobra.Command{
 			return
 		}
 
-		oldPrio := do.Priority
+		var oldField string
 
-		do.Priority = mapPriority(value)
+		switch field {
+		case "prio":
+			oldField = string(do.Priority)
+			do.Priority = mapPriority(value)
+		case "type":
+			oldField = string(do.Type)
+			do.Type = mapType(value)
+		}
+
 		conn.Save(&do)
 
-		fmt.Printf("Do %v updated '%v' -> '%v'\n", id, oldPrio, do.Priority)
+		fmt.Printf("Do %v updated '%v' -> '%v'\n", id, oldField, value)
 	},
 }
 
-// TODO
+// editCmd opens vim to edit the do description
 var editCmd = &cobra.Command{
 	Use:   "edit <do_id>",
 	Short: "Edit a task by ID",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// id := args[0]
-		// fmt.Printf("Edited task %s: %s\n", id, newMessage)
+		id := args[0]
+
+		conn := OpenConn(&cfg)
+
+		var do Do
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		// Start a temporary file
+		tmpfile, err := os.CreateTemp("", "do-edit-*.md")
+		if err != nil {
+			fmt.Printf("Error creating temporary file: %v\n", err)
+			return
+		}
+		defer os.Remove(tmpfile.Name())
+
+		// Write the do description to the temporary file
+		_, err = tmpfile.WriteString(do.Description)
+		if err != nil {
+			fmt.Printf("Error writing to temporary file: %v\n", err)
+			return
+		}
+
+		// Open vim to edit the do description
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+		editorCmd := exec.Command(editor, tmpfile.Name())
+		editorCmd.Stdin = os.Stdin
+		editorCmd.Stdout = os.Stdout
+		editorCmd.Stderr = os.Stderr
+		err = editorCmd.Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Read the edited content
+		content, err := os.ReadFile(tmpfile.Name())
+		if err != nil {
+			fmt.Printf("Error reading edited content: %v\n", err)
+			return
+		}
+
+		// Remove trailing whitespace and newlines
+		do.Description = strings.TrimSpace(string(content))
+
+		// Update the do description
+		conn.Save(&do)
+		fmt.Printf("Edited do %d\n", do.ID)
 	},
 }
 
