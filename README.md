@@ -192,4 +192,7 @@ log_length    = 20
 
 ```
 sqlite3 ~/.captain/testdo.db
+
+.mode column
+.headers on
 ```

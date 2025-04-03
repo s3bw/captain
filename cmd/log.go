@@ -55,6 +55,13 @@ func fmtPrio(task Do) string {
 	}
 }
 
+func fmtBool(b bool) string {
+	if b {
+		return color.New(color.FgGreen).Sprintf("true")
+	}
+	return color.New(color.FgRed).Sprintf("false")
+}
+
 func fmtDate(task Do) string {
 	date := task.CreatedAt
 	colour := color.New(color.FgHiBlack)
@@ -153,4 +160,27 @@ func CrewLog(crew []Mate) {
 	}
 
 	tbl.Print()
+}
+
+func DoDetails(conn *gorm.DB, query *gorm.DB) {
+	var task Do	
+	if err := query.Preload("Doc").Preload("Tags").First(&task).Error; err != nil {
+		log.Fatalf("could not fetch task: %v", err)
+	}
+
+	fmt.Printf("[id=%d]: \t%s\n", task.ID, highlightStyle.Render(task.Description))
+	// Fix display of tags on a single line
+	tagString := ""
+	for _, tag := range task.Tags {
+		tagString += tag.Name
+	}
+	fmt.Printf("for: \t\t%s\n", tagString)
+	fmt.Printf("type: \t\t%s\n", fmtDo(task))
+	fmt.Printf("prio: \t\t%s\n", fmtPrio(task))
+	fmt.Printf("pinned: \t%s\n", fmtBool(task.Pinned))
+	fmt.Printf("sensitive: \t%s\n", fmtBool(task.Sensitive))
+	fmt.Printf("deleted: \t%s\n", fmtBool(task.Deleted))
+	fmt.Printf("doc: \t\t%s\n", fmtBool(task.Doc.ID != 0))
+	fmt.Printf("created_at: \t%s\n", task.CreatedAt)
+	fmt.Printf("completed_at: \t%s\n", task.CompletedAt)
 }

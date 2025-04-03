@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
+	"net/url"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
@@ -32,7 +32,19 @@ var doCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
+		forTag, _ := cmd.Flags().GetString("for")
+		doType, _ := cmd.Flags().GetString("type")
+		prio, _ := cmd.Flags().GetString("prio")
 		conn := OpenConn(&cfg)
+
+		var tag Tag
+		if forTag != "" {
+			result := conn.Where("name = ?", forTag).First(&tag)
+			if result.Error != nil {
+				fmt.Printf("No tag called '%v'\n", forTag)
+				return
+			}
+		}
 
 		// Query for existing do, case insensitive
 		var existing Do
@@ -44,11 +56,19 @@ var doCmd = &cobra.Command{
 
 		do := Do{
 			Description: message,
-			Type:        Task,
+			Type:        mapType(doType),
+			Priority:    mapPriority(prio),
 		}
 
 		if err := conn.Create(&do).Error; err != nil {
 			log.Fatalf("could not insert new row: %v", err)
+		}
+
+		if forTag != "" {
+			doTag := DoTag{DoID: do.ID, TagID: tag.ID}
+			if err := conn.Create(&doTag).Error; err != nil {
+				log.Fatalf("could not insert new row: %v", err)
+			}
 		}
 
 		fmt.Printf("Added do: (id=%d)\n", do.ID)
@@ -176,7 +196,7 @@ var editCmd = &cobra.Command{
 		}
 
 		// Start a temporary file
-		tmpfile, err := os.CreateTemp("", "do-edit-*.md")
+		tmpfile, err := os.CreateTemp("", fmt.Sprintf("do-edit-ID%d-*.md", do.ID))
 		if err != nil {
 			fmt.Printf("Error creating temporary file: %v\n", err)
 			return
@@ -445,7 +465,6 @@ var logCmd = &cobra.Command{
 		query := conn.Not("deleted = ?", true)
 
 		// Apply tag filter if specified
-		fmt.Printf("forTag: %s\n", forTag)
 		if forTag != "" {
 			query = query.
 				Joins("LEFT JOIN do_tags ON do_tags.do_id = dos.id").
@@ -454,7 +473,6 @@ var logCmd = &cobra.Command{
 		}
 
 		// Apply type filter if specified
-		fmt.Printf("doType: %s\n", doType)
 		if doType != "" {
 			query = query.Where("type = ?", doType)
 		}
@@ -589,6 +607,8 @@ var askCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
+		prio, _ := cmd.Flags().GetString("prio")
+
 		conn := OpenConn(&cfg)
 
 		// First create or find the tag
@@ -606,6 +626,7 @@ var askCmd = &cobra.Command{
 		do := Do{
 			Description: message,
 			Type:        Ask,
+			Priority:    mapPriority(prio),
 		}
 		if err := conn.Create(&do).Error; err != nil {
 			log.Fatalf("could not create ask task: %v", err)
@@ -629,6 +650,8 @@ var tellCmd = &cobra.Command{
 		name := args[0]
 		message := args[1]
 
+		prio, _ := cmd.Flags().GetString("prio")
+
 		conn := OpenConn(&cfg)
 
 		// First create or find the tag
@@ -646,6 +669,7 @@ var tellCmd = &cobra.Command{
 		do := Do{
 			Description: message,
 			Type:        Tell,
+			Priority:    mapPriority(prio),
 		}
 		if err := conn.Create(&do).Error; err != nil {
 			log.Fatalf("could not create tell task: %v", err)
@@ -750,6 +774,50 @@ var reassignCmd = &cobra.Command{
 	},
 }
 
+var unassignCmd = &cobra.Command{
+	Use:   "unassign <do_id>",
+	Short: "Unassign the do.",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+
+		conn := OpenConn(&cfg)
+
+		var do Do
+		result := conn.Where("deleted = ?", false).First(&do, id)	
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		// Delete any existing assignments for this do
+		if err := conn.Where("do_id = ?", do.ID).Delete(&DoTag{}).Error; err != nil {
+			log.Fatalf("could not delete existing assignments: %v", err)
+		}
+
+		fmt.Printf("Unassigned do %d\n", do.ID)
+	},
+}
+
+var detailsCmd = &cobra.Command{
+	Use:   "details <do_id>",
+	Short: "Show the details of a do",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		id := args[0]
+		conn := OpenConn(&cfg)
+
+		var do Do
+		result := conn.Where("deleted = ?", false).First(&do, id)
+		if result.Error != nil {
+			fmt.Printf("No do under id '%v'\n", id)
+			return
+		}
+
+		DoDetails(conn, result)
+	},
+}
+
 var docCmd = &cobra.Command{
 	Use:   "doc <do_id>",
 	Short: "Document the specifics",
@@ -767,7 +835,8 @@ var docCmd = &cobra.Command{
 		}
 
 		// Create a temporary file
-		tmpfile, err := os.CreateTemp("", "captain-doc-*.md")
+		title := url.PathEscape(strings.ReplaceAll(do.Description, " ", "+"))
+		tmpfile, err := os.CreateTemp("", fmt.Sprintf("capdoc-ID%d-%s-*.md", do.ID, title))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -896,11 +965,19 @@ var configCmd = &cobra.Command{
 }
 
 func init() {
+	doCmd.Flags().String("for", "", "Set the tag/person")
+	doCmd.Flags().String("type", "task", "Set the type (task/ask/tell/brag/learn/pr/meta)")
+	doCmd.Flags().String("prio", "medium", "Set the priority (low/medium/high)")
+
+	askCmd.Flags().String("prio", "medium", "Set the priority (low/medium/high)")
+
+	tellCmd.Flags().String("prio", "medium", "Set the priority (low/medium/high)")
+
 	logCmd.Flags().IntP("n", "n", cfg.LogLength, "Limit the number of dos outstanding")
 	logCmd.Flags().StringP("sort", "s", "default", "Set the sort (created_at/completed_at/priority)")
 	logCmd.Flags().StringP("order", "o", "desc", "Set the order (asc/desc)")
 	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")
-	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")
+	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")	
 	logCmd.Flags().String("for", "", "Filter tasks for a specific tag/person")
 	logCmd.Flags().String("type", "", "Filter tasks by type (task/ask/tell/brag/learn)")
 
@@ -929,10 +1006,12 @@ func init() {
 		askCmd,
 		tellCmd,
 		reassignCmd,
+		unassignCmd,
 		// - personal development
 		bragCmd,
 		learnCmd,
 		// More Details
+		detailsCmd,
 		docCmd,
 		viewCmd,
 		// Edit Config
