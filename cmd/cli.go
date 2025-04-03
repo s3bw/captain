@@ -799,8 +799,8 @@ var unassignCmd = &cobra.Command{
 	},
 }
 
-var detailsCmd = &cobra.Command{
-	Use:   "details <do_id>",
+var detailCmd = &cobra.Command{
+	Use:   "detail <do_id>",
 	Short: "Show the details of a do",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -1011,7 +1011,7 @@ func init() {
 		bragCmd,
 		learnCmd,
 		// More Details
-		detailsCmd,
+		detailCmd,
 		docCmd,
 		viewCmd,
 		// Edit Config
