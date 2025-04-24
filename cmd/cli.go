@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-	"net/url"
+
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
@@ -474,11 +475,11 @@ var logCmd = &cobra.Command{
 
 		// Apply type filter if specified
 		if doType != "" {
-			query = query.Where("type = ?", doType)
+			query = query.Where("type = ?", mapType(doType))
 		}
 
 		query = query.Limit(n).Order(DoOrder(sort, order))
-		
+
 		if !All {
 			lookBack := time.Now().AddDate(0, 0, -cfg.LookBackDays)
 			query = query.Where("completed_at IS NULL OR completed_at >= ?", lookBack)
@@ -784,7 +785,7 @@ var unassignCmd = &cobra.Command{
 		conn := OpenConn(&cfg)
 
 		var do Do
-		result := conn.Where("deleted = ?", false).First(&do, id)	
+		result := conn.Where("deleted = ?", false).First(&do, id)
 		if result.Error != nil {
 			fmt.Printf("No do under id '%v'\n", id)
 			return
@@ -977,7 +978,7 @@ func init() {
 	logCmd.Flags().StringP("sort", "s", "default", "Set the sort (created_at/completed_at/priority)")
 	logCmd.Flags().StringP("order", "o", "desc", "Set the order (asc/desc)")
 	logCmd.Flags().BoolVar(&All, "all", false, "return all instead of filtering")
-	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")	
+	logCmd.Flags().BoolP("unhide", "u", false, "unhide sensitive tasks")
 	logCmd.Flags().String("for", "", "Filter tasks for a specific tag/person")
 	logCmd.Flags().String("type", "", "Filter tasks by type (task/ask/tell/brag/learn)")
 
