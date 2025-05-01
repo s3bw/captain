@@ -441,6 +441,7 @@ func DoOrder(sortby string, orderby string) string {
 		}
 		return `
 			completed,
+			completed_at DESC,
 			CASE priority
 				WHEN 'high' THEN 1
 				WHEN 'medium' THEN 2
