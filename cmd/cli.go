@@ -696,12 +696,10 @@ var bragCmd = &cobra.Command{
 
 		conn := OpenConn(&cfg)
 
-		now := time.Now()
 		do := Do{
 			Description: message,
 			Type:        Brag,
-			Completed:   true,
-			CompletedAt: &now,
+			Completed:   false,
 		}
 
 		if err := conn.Create(&do).Error; err != nil {
