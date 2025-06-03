@@ -3,13 +3,24 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/fatih/color"
 	"github.com/mattn/go-runewidth"
-	"github.com/s3bw/table"
+	sebtable "github.com/s3bw/table"
 	"gorm.io/gorm"
+)
+
+type checkBox string
+
+const (
+	done    checkBox = "▣"
+	notDone checkBox = "☐"
 )
 
 func fmtDo(task Do) string {
@@ -33,11 +44,11 @@ func fmtDo(task Do) string {
 	}
 }
 
-func fmtBox(task Do) string {
+func fmtBox(task Do) checkBox {
 	if task.Completed {
-		return "▣"
+		return done
 	}
-	return "☐"
+	return notDone
 }
 
 func fmtPrio(task Do) string {
@@ -93,26 +104,19 @@ func DoLog(conn *gorm.DB, query *gorm.DB, unhide bool) {
 	if len(tasks) == 0 {
 		fmt.Println("No tasks found.")
 	} else {
+		re := lipgloss.NewRenderer(os.Stdout)
+		baseStyle := re.NewStyle().Padding(0, 1)
+
 		// Header
-		tbl := table.New("", "", "do", "at", "doc", "type", "prio", "for")
-		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
-		tbl.WithHeaderFormatter(headerFmt)
+		// headers := []string{"", "#", "do", "at", "doc", "type", "prio", "for"}
+		headers := []string{"", "#", "Do", "At", "Doc", "Type", "Prio", "For"}
 
-		columnFmt := color.New(color.FgYellow).SprintfFunc()
-		tbl.WithColumnFormatters(0, columnFmt)
-
-		formatID := color.New(color.FgHiBlack).SprintfFunc()
-		tbl.WithColumnFormatters(1, formatID)
-
-		formatTime := color.New(color.FgHiBlack).SprintfFunc()
-		tbl.WithColumnFormatters(3, formatTime)
-
-		tbl.WithWidthFunc(WidthFunc)
+		var data [][]string
 
 		for _, task := range tasks {
 			docIndicator := ""
 			if task.Doc.ID != 0 { // If Doc exists, it will have a non-zero ID
-				docIndicator = "+"
+				docIndicator = "✻"
 			}
 
 			tag := ""
@@ -121,7 +125,7 @@ func DoLog(conn *gorm.DB, query *gorm.DB, unhide bool) {
 			}
 
 			taskType := fmtDo(task)
-			checkBox := fmtBox(task)
+			checkBx := fmtBox(task)
 			prio := fmtPrio(task)
 
 			description := task.Description
@@ -129,19 +133,50 @@ func DoLog(conn *gorm.DB, query *gorm.DB, unhide bool) {
 				description = strings.Repeat("⠿", len(task.Description))
 			}
 
-			tbl.AddRow(
-				checkBox,
-				task.ID,
+			data = append(data, []string{
+				string(checkBx),
+				strconv.Itoa(int(task.ID)),
 				description,
 				fmtDate(task),
 				docIndicator,
 				taskType,
 				prio,
 				tag,
+			},
 			)
 		}
 
-		tbl.Print()
+		headerStyle := baseStyle.Foreground(lipgloss.Color("37")).Bold(true)
+
+		t := table.New().
+			Border(lipgloss.NormalBorder()).
+			BorderStyle(re.NewStyle().Foreground(lipgloss.Color("238"))).
+			Headers(headers...).
+			Width(0).
+			Rows(data...).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				if row == table.HeaderRow {
+					return headerStyle
+				}
+
+				even := row%2 == 0
+
+				switch col {
+				case 0:
+					if checkBox(data[row][0]) == done {
+						return baseStyle.Foreground(lipgloss.Color("43"))
+					}
+					return baseStyle.Foreground(lipgloss.Color("138"))
+				case 2, 4, 6, 7:
+					if even {
+						return baseStyle.Foreground(lipgloss.Color("223"))
+					}
+					return baseStyle.Foreground(lipgloss.Color("216"))
+				}
+				return baseStyle.Foreground(lipgloss.Color("245"))
+			})
+
+		fmt.Println(t)
 	}
 }
 
@@ -151,7 +186,7 @@ func CrewLog(crew []Mate) {
 		return
 	}
 
-	tbl := table.New("name", "count")
+	tbl := sebtable.New("name", "count")
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	tbl.WithHeaderFormatter(headerFmt)
 
@@ -163,7 +198,7 @@ func CrewLog(crew []Mate) {
 }
 
 func DoDetails(conn *gorm.DB, query *gorm.DB) {
-	var task Do	
+	var task Do
 	if err := query.Preload("Doc").Preload("Tags").First(&task).Error; err != nil {
 		log.Fatalf("could not fetch task: %v", err)
 	}
