@@ -140,7 +140,7 @@ func mapType(s string) DoType {
 
 var setPrioCmd = &cobra.Command{
 	Use:   "set <field> <value> <do_id>",
-	Short: "Changes something of a do, right now just priority",
+	Short: "Changes something of a do, right now; priority & type",
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		field := args[0]
