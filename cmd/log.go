@@ -66,6 +66,10 @@ func fmtPrio(task Do) string {
 	}
 }
 
+func fmtReason(task Do) string {
+	return color.New(color.FgYellow).Sprintf(task.Reason)
+}
+
 func fmtBool(b bool) string {
 	if b {
 		return color.New(color.FgGreen).Sprintf("true")
@@ -215,6 +219,7 @@ func DoDetails(conn *gorm.DB, query *gorm.DB) {
 	fmt.Printf("pinned: \t%s\n", fmtBool(task.Pinned))
 	fmt.Printf("sensitive: \t%s\n", fmtBool(task.Sensitive))
 	fmt.Printf("deleted: \t%s\n", fmtBool(task.Deleted))
+	fmt.Printf("reason: \t%s\n", fmtReason(task))
 	fmt.Printf("doc: \t\t%s\n", fmtBool(task.Doc.ID != 0))
 	fmt.Printf("created_at: \t%s\n", task.CreatedAt)
 	fmt.Printf("completed_at: \t%s\n", task.CompletedAt)

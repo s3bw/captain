@@ -242,11 +242,15 @@ var editCmd = &cobra.Command{
 }
 
 var scratchCmd = &cobra.Command{
-	Use:   "scratch <do_id>",
+	Use:   "scratch <do_id> [reason]",
 	Short: "Soft delete a do",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
+		var reason string
+		if len(args) > 1 {
+			reason = args[1]
+		}
 
 		conn := OpenConn(&cfg)
 
@@ -260,8 +264,13 @@ var scratchCmd = &cobra.Command{
 
 		if Confirmation(do, "Delete this task?", redStyle) {
 			do.Deleted = true
+			do.Reason = reason
 			conn.Save(&do)
-			fmt.Printf("Deleted do %d\n", do.ID)
+			if reason != "" {
+				fmt.Printf("Deleted do %d (reason: %s)\n", do.ID, reason)
+			} else {
+				fmt.Printf("Deleted do %d\n", do.ID)
+			}
 		} else {
 			fmt.Println("Task deletion cancelled")
 		}
@@ -808,7 +817,7 @@ var detailCmd = &cobra.Command{
 		conn := OpenConn(&cfg)
 
 		var do Do
-		result := conn.Where("deleted = ?", false).First(&do, id)
+		result := conn.First(&do, id)
 		if result.Error != nil {
 			fmt.Printf("No do under id '%v'\n", id)
 			return

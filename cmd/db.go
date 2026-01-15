@@ -41,6 +41,7 @@ type Do struct {
 	Type        DoType `gorm:"type:TEXT;not null"`
 	Priority    DoPrio `gorm:"type:TEXT;not null;default:medium"`
 	Deleted     bool   `gorm:"default:false"`
+	Reason      string `gorm:"type:TEXT"`
 	Doc         DoDoc  `gorm:"foreignKey:DoID"`
 	Tags        []Tag  `gorm:"many2many:do_tags;"`
 }
