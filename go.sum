@@ -75,6 +75,8 @@ github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJ
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+github.com/s3bw/mostxt v0.0.0-20250307230251-03417a7f2150 h1:6Tyhay5eNa1ZdDJH7BEXMkbYy4/17gb2apKt37aYF5c=
+github.com/s3bw/mostxt v0.0.0-20250307230251-03417a7f2150/go.mod h1:ETnAbNfHB/rfAXj4a3XcZHAZ4YCtcCT7EszdJGOK8hg=
 github.com/s3bw/table v0.0.0-beta.1 h1:emIOOHMUDCX9D3ZS6kOipGG/se8uv0NoIsQrwwYwIeU=
 github.com/s3bw/table v0.0.0-beta.1/go.mod h1:dqfM/Ecr2VjaD/ICsiT9RawZ+k6ZOaeqPloLjSdELLk=
 github.com/spf13/cobra v1.8.1 h1:e5/vxKd/rZsfSJMUX1agtjeTDf+qv1/JdBF8gg5k9ZM=

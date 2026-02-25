@@ -12,6 +12,8 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
+	"github.com/s3bw/mostxt/src"
+	sebtable "github.com/s3bw/table"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +38,7 @@ var doCmd = &cobra.Command{
 		forTag, _ := cmd.Flags().GetString("for")
 		doType, _ := cmd.Flags().GetString("type")
 		prio, _ := cmd.Flags().GetString("prio")
+		templateName, _ := cmd.Flags().GetString("template")
 		conn := OpenConn(&cfg)
 
 		var tag Tag
@@ -45,6 +48,30 @@ var doCmd = &cobra.Command{
 				fmt.Printf("No tag called '%v'\n", forTag)
 				return
 			}
+		}
+
+		// Process template if provided
+		var templateOutput string
+		if templateName != "" {
+			var template Template
+			result := conn.Where("name = ? AND deleted = ?", templateName, false).First(&template)
+			if result.Error != nil {
+				fmt.Printf("No template named '%s'\n", templateName)
+				return
+			}
+
+			arguments, err := src.ParseTemplate(template.Content)
+			if err != nil {
+				fmt.Printf("Error parsing template: %v\n", err)
+				return
+			}
+
+			inputs := make(map[string]string)
+			for _, arg := range arguments {
+				inputs[arg.Name] = src.GetUserInput(arg)
+			}
+
+			templateOutput = src.FillTemplate(template.Content, arguments, inputs)
 		}
 
 		// Query for existing do, case insensitive
@@ -72,7 +99,19 @@ var doCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("Added do: (id=%d)\n", do.ID)
+		// If template was used, create DoDoc with filled output
+		if templateOutput != "" {
+			doc := DoDoc{
+				DoID: do.ID,
+				Text: templateOutput,
+			}
+			if err := conn.Create(&doc).Error; err != nil {
+				log.Fatalf("could not create doc: %v", err)
+			}
+			fmt.Printf("Added do: (id=%d)\nDocumentation saved for task %d\n", do.ID, do.ID)
+		} else {
+			fmt.Printf("Added do: (id=%d)\n", do.ID)
+		}
 	},
 }
 
@@ -948,6 +987,41 @@ var viewCmd = &cobra.Command{
 	},
 }
 
+var templatesCmd = &cobra.Command{
+	Use:   "templates",
+	Short: "List all templates",
+	Run: func(cmd *cobra.Command, args []string) {
+		conn := OpenConn(&cfg)
+
+		var templates []Template
+		conn.Where("deleted = ?", false).Order("updated_at DESC").Find(&templates)
+
+		if len(templates) == 0 {
+			fmt.Println("No templates found.")
+			return
+		}
+
+		tbl := sebtable.New("name", "preview", "updated")
+		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+		tbl.WithHeaderFormatter(headerFmt)
+
+		for _, tmpl := range templates {
+			// Create preview (first 50 chars, replace newlines with spaces)
+			preview := strings.ReplaceAll(tmpl.Content, "\n", " ")
+			if len(preview) > 50 {
+				preview = preview[:47] + "..."
+			}
+
+			// Format updated date
+			updated := tmpl.UpdatedAt.Format("2006-01-02")
+
+			tbl.AddRow(tmpl.Name, preview, updated)
+		}
+
+		tbl.Print()
+	},
+}
+
 var configCmd = &cobra.Command{
 	Use:   "config <key> <value>",
 	Short: "Set items in the config file",
@@ -977,6 +1051,7 @@ func init() {
 	doCmd.Flags().String("for", "", "Set the tag/person")
 	doCmd.Flags().String("type", "task", "Set the type (task/ask/tell/brag/learn/pr/meta)")
 	doCmd.Flags().String("prio", "medium", "Set the priority (low/medium/high)")
+	doCmd.Flags().StringP("template", "t", "", "Use a template")
 
 	askCmd.Flags().String("prio", "medium", "Set the priority (low/medium/high)")
 
@@ -1023,6 +1098,9 @@ func init() {
 		detailCmd,
 		docCmd,
 		viewCmd,
+		// Templates
+		templateCmd,
+		templatesCmd,
 		// Edit Config
 		configCmd,
 	)
