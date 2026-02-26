@@ -68,6 +68,15 @@ type DoTag struct {
 	Tag   Tag  `gorm:"foreignKey:TagID"`
 }
 
+type Template struct {
+	ID        uint      `gorm:"primaryKey"`
+	Name      string    `gorm:"unique;not null"`
+	Content   string    `gorm:"type:TEXT;not null"`
+	Deleted   bool      `gorm:"default:false"`
+	CreatedAt time.Time `gorm:"default:current_timestamp"`
+	UpdatedAt time.Time `gorm:"default:current_timestamp"`
+}
+
 func OpenConn(cfg *Config) *gorm.DB {
 	dbPath := fmt.Sprintf("%s/%s", cfg.CaptainDir, cfg.DBFile)
 	conn, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
@@ -77,7 +86,7 @@ func OpenConn(cfg *Config) *gorm.DB {
 		log.Fatalf("could not open database: %v", err)
 	}
 
-	err = conn.AutoMigrate(&Do{}, &Tag{}, &DoTag{}, &DoDoc{})
+	err = conn.AutoMigrate(&Do{}, &Tag{}, &DoTag{}, &DoDoc{}, &Template{})
 	if err != nil {
 		log.Fatalf("could not migrate database: %v", err)
 	}

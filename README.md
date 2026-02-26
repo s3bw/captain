@@ -6,6 +6,40 @@
     Log book, recording and documenting
 </div>
 
+## Installation
+
+### Prerequisites
+- Go 1.21 or higher
+- Git
+
+### Quick Install
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/captain.git
+cd captain
+
+# Build the binary
+go build -o captain
+
+# Move to your PATH (optional)
+sudo mv captain /usr/local/bin/
+
+# Or add to your PATH
+export PATH="$PATH:$(pwd)"
+```
+
+### First Run
+
+```bash
+# Initialize captain (creates config and database)
+captain log
+```
+
+Captain will create a `~/.captain` directory with:
+- `config.ini` - Configuration file
+- `testdo.db` - SQLite database
+
 Do Types:
 
 - `task`: Things to do
@@ -168,6 +202,61 @@ View the do's document
 ```
 $ captain view <do.id>
 ```
+
+### Templates
+
+Templates allow you to create reusable task structures with placeholders that get filled in when creating a new task. Template output is saved as task documentation while the command-line description remains as the task title.
+
+List all templates
+
+```
+$ captain templates
+$ captain template list
+```
+
+Create a new template
+
+```
+$ captain template create <name>
+```
+
+This opens your `$EDITOR` where you can write a template with mostxt placeholders:
+
+```markdown
+Meeting with {{ person:string example('John Doe') }}
+
+Date: {{ meeting_date:datetime 'YYYY-MM-DD' }}
+
+Agenda:
+{{ agenda:list describe('Enter agenda items, one per line. Empty line to finish.') }}
+
+Notes:
+{{ notes }}
+```
+
+Edit an existing template
+
+```
+$ captain template edit <name>
+```
+
+Delete a template
+
+```
+$ captain template delete <name>
+```
+
+Use a template to create a task
+
+```
+$ captain do 'Set up 121 meeting' --template 121
+$ captain do 'Set up 121 meeting' -t 121
+```
+
+When using a template:
+1. You'll be prompted to fill in each placeholder
+2. The task description will be your command-line message
+3. The filled template will be saved as task documentation (viewable with `captain view <id>`)
 
 ### Config
 
