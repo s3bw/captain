@@ -8,11 +8,13 @@ require (
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/fatih/color v1.18.0
 	github.com/mattn/go-runewidth v0.0.16
+	github.com/s3bw/mostxt v0.0.0-20250307230251-03417a7f2150
 	github.com/s3bw/table v0.0.0-beta.1
+	github.com/s3bw/vfs v0.1.0
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/ini.v1 v1.67.0
-	gorm.io/driver/sqlite v1.5.7
-	gorm.io/gorm v1.25.12
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.30.0
 )
 
 require (
@@ -39,7 +41,6 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/s3bw/mostxt v0.0.0-20250307230251-03417a7f2150 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/yuin/goldmark v1.7.4 // indirect
 	github.com/yuin/goldmark-emoji v1.0.3 // indirect
@@ -47,5 +48,7 @@ require (
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )
+
+replace github.com/s3bw/vfs => ../vfs

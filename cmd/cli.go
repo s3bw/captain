@@ -512,7 +512,7 @@ var logCmd = &cobra.Command{
 		forTag, _ := cmd.Flags().GetString("for")
 		doType, _ := cmd.Flags().GetString("type")
 
-		query := conn.Not("deleted = ?", true)
+		query := conn.Not("deleted = ?", true).Not("promoted = ?", true)
 
 		// Apply tag filter if specified
 		if forTag != "" {
@@ -543,7 +543,10 @@ var pinnedCmd = &cobra.Command{
 	Short: "Log pinned tasks",
 	Run: func(cmd *cobra.Command, args []string) {
 		conn := OpenConn(&cfg)
-		query := conn.Where("pinned = ? AND deleted = ?", true, false).Order("created_at DESC")
+		query := conn.Where("pinned = ?", true).
+			Not("deleted = ?", true).
+			Not("promoted = ?", true).
+			Order("created_at DESC")
 
 		DoLog(conn, query, false)
 	},
@@ -559,6 +562,7 @@ var todayCmd = &cobra.Command{
 
 		query := conn
 		query = query.Not("deleted = ?", true).
+			Not("promoted = ?", true).
 			Where("completed_at IS NULL OR completed_at >= ?", oneDayAgo).
 			Limit(100).Order(`
 			completed,
